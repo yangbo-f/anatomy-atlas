@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07101f" />
+    <meta
+      name="description"
+      content="基于真实 GLB 人体模型的交互式三维解剖学习平台"
+    />
+    <title>Anatomy Atlas · 人体三维解剖图谱</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Anatomy Atlas 首页">
+          <span class="brand-mark" aria-hidden="true">A</span>
+          <span>
+            <strong>ANATOMY ATLAS</strong>
+            <small>人体三维解剖图谱</small>
+          </span>
+        </a>
+
+        <div class="topbar-center">
+          <span class="status-dot"></span>
+          <span>交互式 3D 学习平台</span>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="icon-button" id="helpButton" type="button" title="操作帮助">
+            <span>?</span>
+          </button>
+          <button class="icon-button" id="fullscreenButton" type="button" title="进入全屏">
+            <span>⛶</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-heading">
+            <span class="eyebrow">ANATOMICAL SYSTEMS</span>
+            <h1>解剖系统</h1>
+            <p>勾选多个系统叠加观察</p>
+          </div>
+
+          <label class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="systemSearch" type="search" placeholder="搜索解剖系统" autocomplete="off" />
+          </label>
+
+          <nav class="system-list" id="systemList" aria-label="人体解剖系统"></nav>
+
+          <div class="sidebar-footer">
+            <span class="footer-badge">GLB</span>
+            <div>
+              <strong>真实解剖模型</strong>
+              <span>Blender / Z-Anatomy</span>
+            </div>
+          </div>
+        </aside>
+
+        <section class="viewer-panel" id="viewerPanel">
+          <div class="viewer-header">
+            <div>
+              <span class="breadcrumb">人体解剖 / <b id="breadcrumbName">骨骼系统</b></span>
+              <h2 id="viewerTitle">骨骼系统</h2>
+            </div>
+            <span class="model-format">3D · GLB</span>
+          </div>
+
+          <div class="canvas-shell" id="canvasShell">
+            <canvas id="anatomyCanvas" aria-label="人体三维解剖模型"></canvas>
+
+            <div class="loading-overlay" id="loadingOverlay">
+              <div class="loader-visual">
+                <span></span><span></span><span></span>
+              </div>
+              <strong id="loadingTitle">正在载入三维模型</strong>
+              <p id="loadingText">正在读取真实解剖数据…</p>
+              <div class="progress-track">
+                <span id="progressBar"></span>
+              </div>
+              <small id="progressLabel">0%</small>
+            </div>
+
+            <div class="error-overlay" id="errorOverlay" hidden>
+              <span class="error-code">LOAD ERROR</span>
+              <h3>模型加载失败</h3>
+              <p id="errorMessage">无法读取 GLB 模型文件。</p>
+              <button id="retryButton" type="button">重新加载</button>
+            </div>
+
+            <div class="orientation-widget" aria-hidden="true">
+              <span class="axis-y">Y</span>
+              <span class="axis-x">X</span>
+              <span class="axis-z">Z</span>
+              <i></i>
+            </div>
+
+            <div class="viewer-hint" id="viewerHint">
+              <span>拖拽旋转</span>
+              <span>滚轮缩放</span>
+              <span>右键或平移模式移动视野</span>
+            </div>
+
+            <div class="viewer-toolbar">
+              <button id="resetViewButton" type="button" title="重置视角">
+                <span>↺</span><b>重置视角</b>
+              </button>
+              <i></i>
+              <button id="autoRotateButton" type="button" aria-pressed="false" title="自动旋转">
+                <span>◉</span><b>自动旋转</b>
+              </button>
+              <i></i>
+              <button id="focusButton" type="button" title="模型居中">
+                <span>⌖</span><b>模型居中</b>
+              </button>
+              <i></i>
+              <button id="panModeButton" type="button" aria-pressed="false" title="左键拖拽平移视野">
+                <span>✥</span><b>平移模式</b>
+              </button>
+              <i></i>
+              <button id="boxSelectButton" type="button" aria-pressed="false" title="拖框选择多个结构">
+                <span>▧</span><b>框选结构</b>
+              </button>
+            </div>
+
+            <div class="selection-box" id="selectionBox" hidden></div>
+          </div>
+        </section>
+
+        <aside class="info-panel">
+          <div class="info-scroll">
+            <div class="info-kicker">
+              <span id="infoIndex">01</span>
+              <span>当前系统</span>
+            </div>
+            <h2 id="infoTitle">骨骼系统</h2>
+            <p class="latin-name" id="infoLatin">Systema skeletale</p>
+
+            <div class="info-divider"></div>
+
+            <p class="info-description" id="infoDescription"></p>
+
+            <section class="info-section selected-part" id="selectedPartSection" hidden>
+              <span class="selected-label">SELECTED STRUCTURE</span>
+              <h3>当前选中结构</h3>
+              <strong id="selectedPartName">—</strong>
+              <div class="selected-part-list" id="selectedPartList"></div>
+              <p>单击模型可切换查看其他结构。</p>
+            </section>
+
+            <section class="info-section">
+              <h3>学习要点</h3>
+              <ul id="infoFacts"></ul>
+            </section>
+
+            <section class="info-section model-summary">
+              <span class="summary-dot"></span>
+              <div>
+                <strong id="modelStatus">载入中</strong>
+                <small>GLB 三维模型</small>
+              </div>
+              <span class="model-counts" aria-hidden="true">
+                <i id="meshCount">—</i>
+                <i id="materialCount">—</i>
+              </span>
+            </section>
+          </div>
+
+          <div class="panel-note">
+            <span>i</span>
+            <p>模型用于解剖学习与结构观察，不替代专业医学诊断。</p>
+          </div>
+        </aside>
+      </main>
+
+      <div class="help-dialog" id="helpDialog" hidden>
+        <div class="help-card">
+          <button class="dialog-close" id="closeHelpButton" type="button">×</button>
+          <span class="eyebrow">VIEWER CONTROLS</span>
+          <h2>三维查看操作</h2>
+          <dl>
+            <div><dt>鼠标左键拖拽</dt><dd>旋转模型</dd></div>
+            <div><dt>鼠标滚轮</dt><dd>放大或缩小</dd></div>
+            <div><dt>鼠标右键拖拽</dt><dd>平移观察位置</dd></div>
+            <div><dt>平移模式</dt><dd>用左键拖动到上半身、腰部或腿部</dd></div>
+            <div><dt>框选结构</dt><dd>拖出矩形，同时选择并高亮多个结构</dd></div>
+            <div><dt>单击模型结构</dt><dd>查看网格名称</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
