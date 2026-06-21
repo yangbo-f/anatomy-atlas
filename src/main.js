@@ -106,6 +106,10 @@ scene.add(new THREE.HemisphereLight(0xcce5ff, 0x172033, 1.15));
 const keyLight = new THREE.DirectionalLight(0xffffff, 2.25);
 keyLight.position.set(4, 6, 7);
 keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.bias = -0.00015;
+keyLight.shadow.normalBias = 0.035;
+keyLight.shadow.radius = 2.5;
 scene.add(keyLight);
 const fillLight = new THREE.DirectionalLight(0x79bfff, 0.85);
 fillLight.position.set(-5, 2, 4);
@@ -672,10 +676,14 @@ function inspectModel(model) {
       return;
     }
     meshes += 1;
-    object.castShadow = true;
-    object.receiveShadow = true;
     const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
-    objectMaterials.filter(Boolean).forEach((material) => {
+    const visibleMaterials = objectMaterials.filter(Boolean);
+    object.castShadow = visibleMaterials.some(
+      (material) => !material.transparent || material.opacity >= 0.85,
+    );
+    // Closely layered anatomical surfaces otherwise cast black self-shadow artifacts.
+    object.receiveShadow = false;
+    visibleMaterials.forEach((material) => {
       materials.add(material.uuid);
       if ('envMapIntensity' in material) material.envMapIntensity = 0.8;
       material.needsUpdate = true;
