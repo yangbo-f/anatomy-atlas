@@ -408,6 +408,35 @@ function isMuscleCoveringStructure(object) {
   );
 }
 
+function getPickVolume(object) {
+  if (object.userData.anatomyPickVolume !== undefined) return object.userData.anatomyPickVolume;
+  if (!object.geometry?.boundingBox) object.geometry?.computeBoundingBox();
+  const size = object.geometry?.boundingBox?.getSize(new THREE.Vector3());
+  if (!size) return Number.POSITIVE_INFINITY;
+  object.userData.anatomyPickVolume = size.x * size.y * size.z;
+  object.userData.anatomyPickLongestSide = Math.max(size.x, size.y, size.z);
+  return object.userData.anatomyPickVolume;
+}
+
+function isBroadMuscleSheet(object) {
+  const name = object.name.toLowerCase();
+  const materialName = (Array.isArray(object.material) ? object.material : [object.material])
+    .filter(Boolean)
+    .map((material) => material.name)
+    .join(' ')
+    .toLowerCase();
+  const volume = getPickVolume(object);
+  const longestSide = object.userData.anatomyPickLongestSide ?? 0;
+
+  return (
+    volume > 0.018 ||
+    longestSide > 0.9 ||
+    /trapezius|latissimus|deltoid|gluteus maximus|pectoralis major|superficial/.test(
+      `${name} ${materialName}`,
+    )
+  );
+}
+
 function getPreferredIntersection(intersections) {
   const visibleHits = intersections.filter((intersection) =>
     isHierarchyVisible(intersection.object),
@@ -417,11 +446,28 @@ function getPreferredIntersection(intersections) {
   const muscularHits = visibleHits.filter(
     (intersection) => getObjectSystemId(intersection.object) === 'muscular',
   );
-  return (
-    muscularHits.find((intersection) => !isMuscleCoveringStructure(intersection.object)) ||
-    muscularHits[0] ||
-    visibleHits[0]
+  const anatomicalHits = muscularHits.filter(
+    (intersection) => !isMuscleCoveringStructure(intersection.object),
   );
+  const firstAnatomicalHit = anatomicalHits[0];
+  if (!firstAnatomicalHit) return muscularHits[0] || visibleHits[0];
+  if (!isBroadMuscleSheet(firstAnatomicalHit.object)) return firstAnatomicalHit;
+
+  const firstDistance = firstAnatomicalHit.distance;
+  const firstVolume = getPickVolume(firstAnatomicalHit.object);
+  const deeperSpecificHit = anatomicalHits
+    .slice(1, 18)
+    .filter((intersection) => {
+      const volume = getPickVolume(intersection.object);
+      return (
+        volume < firstVolume * 0.55 &&
+        intersection.distance - firstDistance < 1.75 &&
+        !isBroadMuscleSheet(intersection.object)
+      );
+    })
+    .sort((a, b) => getPickVolume(a.object) - getPickVolume(b.object))[0];
+
+  return deeperSpecificHit || firstAnatomicalHit;
 }
 
 function setReferenceAppearance(group) {
@@ -603,11 +649,12 @@ function repairAnatomyMaterials(model, system) {
         }
       }
 
+      if ('metalness' in material) material.metalness = 0;
+      if ('roughness' in material) material.roughness = Math.max(material.roughness ?? 0, 0.58);
+
       const color = getAnatomyColor(object, material, system);
       if (shouldApplyAnatomyColor(material, system, color)) {
         material.color.copy(color);
-        material.metalness = 0;
-        material.roughness = Math.max(material.roughness ?? 0, 0.62);
         colorized += 1;
       }
 
@@ -678,10 +725,8 @@ function inspectModel(model) {
     meshes += 1;
     const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
     const visibleMaterials = objectMaterials.filter(Boolean);
-    object.castShadow = visibleMaterials.some(
-      (material) => !material.transparent || material.opacity >= 0.85,
-    );
-    // Closely layered anatomical surfaces otherwise cast black self-shadow artifacts.
+    // Dense anatomical layers overlap heavily; mesh shadows create black self-shadow artifacts.
+    object.castShadow = false;
     object.receiveShadow = false;
     visibleMaterials.forEach((material) => {
       materials.add(material.uuid);
